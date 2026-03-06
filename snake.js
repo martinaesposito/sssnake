@@ -164,45 +164,83 @@ function keyPressed() {
 }
 
 ///
+function handleTouch() {
+  if (touches.length === 0) return;
 
-function setupGyro() {
-  if (
-    typeof DeviceOrientationEvent !== "undefined" &&
-    typeof DeviceOrientationEvent.requestPermission === "function"
-  ) {
-    // iOS 13+ richiede permesso esplicito
-    DeviceOrientationEvent.requestPermission().then((response) => {
-      if (response === "granted") {
-        window.addEventListener("deviceorientation", handleGyro);
-      }
-    });
-  } else {
-    // Android e iOS vecchi — nessun permesso necessario
-    window.addEventListener("deviceorientation", handleGyro);
-  }
-}
-
-let gyroActive = false;
-
-function handleGyro(event) {
   gyroActive = true;
-  let gamma = event.gamma; // inclinazione sinistra/destra: -90 a 90
-  let beta = event.beta; // inclinazione avanti/indietro: -180 a 180
 
-  const THRESHOLD = 15; // gradi di inclinazione minima — CAMBIA QUI
+  let x = touches[0].x;
+  let y = touches[0].y;
 
-  if (abs(gamma) > abs(beta)) {
-    // Movimento dominante: sinistra/destra
-    if (gamma > THRESHOLD) s.dir(1, 0);
-    if (gamma < -THRESHOLD) s.dir(-1, 0);
+  let centerX = width / 2;
+  let centerY = height / 2;
+
+  const THRESHOLD = 50; // distanza minima dal centro
+
+  let dx = x - centerX;
+  let dy = y - centerY;
+
+  if (abs(dx) > abs(dy)) {
+    // movimento dominante orizzontale
+    if (dx > THRESHOLD) s.dir(1, 0); // destra
+    if (dx < -THRESHOLD) s.dir(-1, 0); // sinistra
   } else {
-    // Movimento dominante: su/giù
-    if (beta > THRESHOLD) s.dir(0, 1);
-    if (beta < -THRESHOLD) s.dir(0, -1);
+    // movimento dominante verticale
+    if (dy > THRESHOLD) s.dir(0, 1); // giù
+    if (dy < -THRESHOLD) s.dir(0, -1); // su
   }
 
-  if (gyroActive) {
-    autoMode = false;
-    lastKeyFrame = frameCount;
-  }
+  autoMode = false;
+  lastKeyFrame = frameCount;
 }
+
+function touchStarted() {
+  handleTouch();
+}
+
+function touchMoved() {
+  handleTouch();
+  return false;
+}
+
+// function setupGyro() {
+//   if (
+//     typeof DeviceOrientationEvent !== "undefined" &&
+//     typeof DeviceOrientationEvent.requestPermission === "function"
+//   ) {
+//     // iOS 13+ richiede permesso esplicito
+//     DeviceOrientationEvent.requestPermission().then((response) => {
+//       if (response === "granted") {
+//         window.addEventListener("deviceorientation", handleGyro);
+//       }
+//     });
+//   } else {
+//     // Android e iOS vecchi — nessun permesso necessario
+//     window.addEventListener("deviceorientation", handleGyro);
+//   }
+// }
+
+// let gyroActive = false;
+
+// function handleGyro(event) {
+//   gyroActive = true;
+//   let gamma = event.gamma; // inclinazione sinistra/destra: -90 a 90
+//   let beta = event.beta; // inclinazione avanti/indietro: -180 a 180
+
+//   const THRESHOLD = 15; // gradi di inclinazione minima — CAMBIA QUI
+
+//   if (abs(gamma) > abs(beta)) {
+//     // Movimento dominante: sinistra/destra
+//     if (gamma > THRESHOLD) s.dir(1, 0);
+//     if (gamma < -THRESHOLD) s.dir(-1, 0);
+//   } else {
+//     // Movimento dominante: su/giù
+//     if (beta > THRESHOLD) s.dir(0, 1);
+//     if (beta < -THRESHOLD) s.dir(0, -1);
+//   }
+
+//   if (gyroActive) {
+//     autoMode = false;
+//     lastKeyFrame = frameCount;
+//   }
+// }
