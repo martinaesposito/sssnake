@@ -162,3 +162,47 @@ function keyPressed() {
     lastKeyFrame = frameCount;
   }
 }
+
+///
+
+function setupGyro() {
+  if (
+    typeof DeviceOrientationEvent !== "undefined" &&
+    typeof DeviceOrientationEvent.requestPermission === "function"
+  ) {
+    // iOS 13+ richiede permesso esplicito
+    DeviceOrientationEvent.requestPermission().then((response) => {
+      if (response === "granted") {
+        window.addEventListener("deviceorientation", handleGyro);
+      }
+    });
+  } else {
+    // Android e iOS vecchi — nessun permesso necessario
+    window.addEventListener("deviceorientation", handleGyro);
+  }
+}
+
+let gyroActive = false;
+
+function handleGyro(event) {
+  gyroActive = true;
+  let gamma = event.gamma; // inclinazione sinistra/destra: -90 a 90
+  let beta = event.beta; // inclinazione avanti/indietro: -180 a 180
+
+  const THRESHOLD = 15; // gradi di inclinazione minima — CAMBIA QUI
+
+  if (abs(gamma) > abs(beta)) {
+    // Movimento dominante: sinistra/destra
+    if (gamma > THRESHOLD) s.dir(1, 0);
+    if (gamma < -THRESHOLD) s.dir(-1, 0);
+  } else {
+    // Movimento dominante: su/giù
+    if (beta > THRESHOLD) s.dir(0, 1);
+    if (beta < -THRESHOLD) s.dir(0, -1);
+  }
+
+  if (gyroActive) {
+    autoMode = false;
+    lastKeyFrame = frameCount;
+  }
+}

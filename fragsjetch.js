@@ -69,6 +69,14 @@ function setup() {
 
   song.loop();
   song.setVolume(0);
+
+  document.addEventListener(
+    "touchstart",
+    () => {
+      setupGyro();
+    },
+    { once: true },
+  );
 }
 
 function draw() {
