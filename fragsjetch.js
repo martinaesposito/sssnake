@@ -9,10 +9,8 @@ let drawnCircles = [];
 let segmentCount = 0;
 let colorPhase = 0;
 
-// Rileva mobile una volta sola
 const IS_MOBILE = /Mobi|Android|iPhone|iPad/i.test(navigator.userAgent);
-
-const CIRCLES_PER_FRAME = IS_MOBILE ? 3 : 6;
+const CIRCLES_PER_FRAME = IS_MOBILE ? 2 : 6;
 const MAX_SEGMENTS = IS_MOBILE ? 2 : 3;
 let segmentBoundaries = [0];
 
@@ -22,6 +20,10 @@ let grainShader;
 let grainLayer;
 let bgLayer;
 let snakeLayer;
+
+// Layer persistente per il serpentone — si aggiorna solo incrementalmente
+let circleLayer;
+let snakeDirty = true; // flag: ridisegna snakeLayer solo se il serpente si è mosso
 
 function preload() {
   song = loadSound("sound.mp3");
@@ -36,14 +38,16 @@ let fadingCircles = [];
 let lastArc = -1;
 
 function setup() {
-  // Su mobile riduci risoluzione del canvas
-  if (IS_MOBILE) {
-    pixelDensity(1);
-  }
-
+  pixelDensity(IS_MOBILE ? 1 : pixelDensity());
   scl = round(height / 7);
   createCanvas(windowWidth, windowHeight);
   noStroke();
+
+  // Layer persistente cerchi — non viene mai cancellato, solo aggiornato
+  circleLayer = createGraphics(windowWidth, windowHeight);
+  circleLayer.noStroke();
+
+  snakeLayer = createGraphics(windowWidth, windowHeight);
 
   if (!IS_MOBILE) {
     grainLayer = createGraphics(windowWidth, windowHeight, WEBGL);
@@ -51,8 +55,6 @@ function setup() {
     bgLayer = createGraphics(windowWidth, windowHeight);
     bgLayer.noStroke();
   }
-
-  snakeLayer = createGraphics(windowWidth, windowHeight);
 
   //SNAKE
   gameSize = floor((min(width, height) * 0.7) / scl) * scl;
@@ -75,14 +77,6 @@ function setup() {
 
   song.loop();
   song.setVolume(0);
-
-  // document.addEventListener(
-  //   "touchstart",
-  //   () => {
-  //     setupGyro();
-  //   },
-  //   { once: true },
-  // );
 }
 
 function draw() {
@@ -91,12 +85,14 @@ function draw() {
   noStroke();
   time += 0.1;
 
-  //SFONDO
+  // SFONDO gradiente
   push();
   let r = max(width, height) * 0.8;
   let angle = time * 0.1;
-  ((x1 = width / 2 + cos(angle) * r), (y1 = height / 2 + sin(angle) * r));
-  ((x2 = width / 2 - cos(angle) * r), (y2 = height / 2 - sin(angle) * r));
+  let x1 = width / 2 + cos(angle) * r;
+  let y1 = height / 2 + sin(angle) * r;
+  let x2 = width / 2 - cos(angle) * r;
+  let y2 = height / 2 - sin(angle) * r;
   let grad = drawingContext.createLinearGradient(x1, y1, x2, y2);
   grad.addColorStop(0, "black");
   grad.addColorStop(1, "white");
@@ -104,13 +100,8 @@ function draw() {
   drawingContext.fillRect(0, 0, width, height);
   pop();
 
-  //SERPENTONE DI CERCHI
-  push();
-  for (let c of drawnCircles) {
-    fill(c.gray);
-    circle(c.x, c.y, c.radius);
-  }
-
+  // SERPENTONE: aggiorna circleLayer solo con i cerchi nuovi/rimossi
+  // Non ridisegna mai tutto — solo le differenze
   if (currentSegment) {
     for (let f = 0; f < CIRCLES_PER_FRAME; f++) {
       if (drawIndex < currentSegment.px.length) {
@@ -119,10 +110,12 @@ function draw() {
         let radius = 50 + 45 * sin(colorPhase * 6);
         let gray = 127 + 127 * sin(colorPhase * 8);
 
-        // Volume audio solo ogni 3 frame su mobile
-        if (!IS_MOBILE || frameCount % 3 === 0) {
-          let vol = map(gray, 0, 255, 0, 0.25);
-          song.setVolume(vol, 0.5);
+        // Disegna direttamente sul layer persistente
+        circleLayer.fill(gray);
+        circleLayer.circle(x, y, radius);
+
+        if (frameCount % 3 === 0) {
+          song.setVolume(map(gray, 0, 255, 0, 0.25), 0.5);
         }
 
         drawnCircles.push({ x, y, radius, gray });
@@ -137,6 +130,7 @@ function draw() {
     }
   }
 
+  // Rimuovi i cerchi vecchi e ridisegna il layer da zero
   if (segmentBoundaries.length > MAX_SEGMENTS) {
     for (let f = 0; f < CIRCLES_PER_FRAME; f++) {
       if (drawnCircles.length > 0) {
@@ -146,10 +140,19 @@ function draw() {
         }
       }
     }
+    // Ridisegna il layer da zero dopo la rimozione
+    circleLayer.clear();
+    circleLayer.noStroke();
+    for (let c of drawnCircles) {
+      circleLayer.fill(c.gray);
+      circleLayer.circle(c.x, c.y, c.radius);
+    }
   }
-  pop();
 
-  // ── GRAIN SHADER: solo su desktop ──
+  // Stampa il layer cerchi sul canvas principale
+  image(circleLayer, 0, 0);
+
+  // GRAIN SHADER: solo desktop
   if (!IS_MOBILE) {
     bgLayer.clear();
     bgLayer.drawingContext.drawImage(
@@ -172,13 +175,14 @@ function draw() {
     image(grainLayer, 0, 0);
   }
 
-  // ── NITIDI sopra il grain: cerchi di curvatura + bordo gioco ──
+  // Cerchi di curvatura — nitidi sopra il grain
   if (showCurvatureCircle && currentSegment) {
     drawCurvatureCircle(currentSegment);
   }
 
   justAte = false;
 
+  // Bordo gioco
   drawingContext.strokeStyle = "rgba(255,255,255,0.4)";
   drawingContext.lineWidth = 1;
   drawingContext.strokeRect(gameX, gameY, gameSize, gameSize);
@@ -196,9 +200,25 @@ function draw() {
       hiss.play();
     }
     s.update();
+    snakeDirty = true; // il serpente si è mosso, ridisegna
   }
 
-  s.show();
+  // Snake layer: ridisegna solo se il serpente si è mosso
+  if (snakeDirty) {
+    s.show();
+    snakeDirty = false;
+  } else {
+    // Altrimenti stampa semplicemente il layer già pronto
+    blendMode(DIFFERENCE);
+    fill(255);
+    noStroke();
+    for (var i = 0; i < s.tail.length; i++) {
+      rect(gameX + s.tail[i].x, gameY + s.tail[i].y, scl, scl);
+    }
+    rect(gameX + s.x, gameY + s.y, scl, scl);
+    blendMode(BLEND);
+    image(snakeLayer, 0, 0);
+  }
 
   // Cibo
   blendMode(BLEND);
@@ -217,6 +237,8 @@ function draw() {
     rect(0, 0, width, height);
     hiss.setVolume(map(elapsed, 0, 1000, 1, 0));
   }
+
+  drawTouchHints();
 }
 
 // ─── CERCHIO DI CURVATURA CON FADE ───────────────────────────
@@ -283,4 +305,69 @@ function drawCurvatureCircle(seg) {
     drawingContext.fill();
     drawingContext.closePath();
   }
+}
+
+function drawTouchHints() {
+  if (!IS_MOBILE) return;
+
+  let margin = scl * 1.2;
+  let r = scl * 0.35;
+  let pulse = 0.15 + 0.1 * sin(frameCount * 0.05); // pulsazione lenta
+
+  blendMode(BLEND);
+  noFill();
+  stroke(255, 60);
+  strokeWeight(1);
+
+  // Su
+  circle(width / 2, margin, r * 2);
+  // Giù
+  circle(width / 2, height - margin, r * 2);
+  // Sinistra
+  circle(margin, height / 2, r * 2);
+  // Destra
+  circle(width - margin, height / 2, r * 2);
+
+  // Freccia interna — piccolo triangolino
+  fill(255, pulse * 255);
+  noStroke();
+  // Su
+  triangle(
+    width / 2,
+    margin - r * 0.6,
+    width / 2 - r * 0.4,
+    margin + r * 0.3,
+    width / 2 + r * 0.4,
+    margin + r * 0.3,
+  );
+  // Giù
+  triangle(
+    width / 2,
+    height - margin + r * 0.6,
+    width / 2 - r * 0.4,
+    height - margin - r * 0.3,
+    width / 2 + r * 0.4,
+    height - margin - r * 0.3,
+  );
+  // Sinistra
+  triangle(
+    margin - r * 0.6,
+    height / 2,
+    margin + r * 0.3,
+    height / 2 - r * 0.4,
+    margin + r * 0.3,
+    height / 2 + r * 0.4,
+  );
+  // Destra
+  triangle(
+    width - margin + r * 0.6,
+    height / 2,
+    width - margin - r * 0.3,
+    height / 2 - r * 0.4,
+    width - margin - r * 0.3,
+    height / 2 + r * 0.4,
+  );
+
+  noStroke();
+  strokeWeight(1);
 }

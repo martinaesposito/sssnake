@@ -167,27 +167,23 @@ function keyPressed() {
 function handleTouch() {
   if (touches.length === 0) return;
 
-  gyroActive = true;
-
   let x = touches[0].x;
   let y = touches[0].y;
 
   let centerX = width / 2;
   let centerY = height / 2;
 
-  const THRESHOLD = 50; // distanza minima dal centro
+  const THRESHOLD = 50;
 
   let dx = x - centerX;
   let dy = y - centerY;
 
   if (abs(dx) > abs(dy)) {
-    // movimento dominante orizzontale
-    if (dx > THRESHOLD) s.dir(1, 0); // destra
-    if (dx < -THRESHOLD) s.dir(-1, 0); // sinistra
+    if (dx > THRESHOLD) s.dir(1, 0);
+    if (dx < -THRESHOLD) s.dir(-1, 0);
   } else {
-    // movimento dominante verticale
-    if (dy > THRESHOLD) s.dir(0, 1); // giù
-    if (dy < -THRESHOLD) s.dir(0, -1); // su
+    if (dy > THRESHOLD) s.dir(0, 1);
+    if (dy < -THRESHOLD) s.dir(0, -1);
   }
 
   autoMode = false;
