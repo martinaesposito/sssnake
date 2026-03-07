@@ -20,10 +20,7 @@ let grainShader;
 let grainLayer;
 let bgLayer;
 let snakeLayer;
-
-// Layer persistente per il serpentone — si aggiorna solo incrementalmente
-let circleLayer;
-let snakeDirty = true; // flag: ridisegna snakeLayer solo se il serpente si è mosso
+let snakeDirty = true;
 
 function preload() {
   song = loadSound("sound.mp3");
@@ -43,10 +40,6 @@ function setup() {
   createCanvas(windowWidth, windowHeight);
   noStroke();
 
-  // Layer persistente cerchi — non viene mai cancellato, solo aggiornato
-  circleLayer = createGraphics(windowWidth, windowHeight);
-  circleLayer.noStroke();
-
   snakeLayer = createGraphics(windowWidth, windowHeight);
 
   if (!IS_MOBILE) {
@@ -56,7 +49,6 @@ function setup() {
     bgLayer.noStroke();
   }
 
-  //SNAKE
   gameSize = floor((min(width, height) * 0.7) / scl) * scl;
   gameX = floor((width - gameSize) / 2);
   gameY = floor((height - gameSize) / 2);
@@ -77,16 +69,17 @@ function setup() {
 
   song.loop();
   song.setVolume(0);
+
+  createTouchButtons();
 }
 
 function draw() {
   blendMode(BLEND);
-  background(255);
+  background(0);
   noStroke();
   time += 0.1;
 
-  // SFONDO gradiente
-  push();
+  // ── SFONDO gradiente sul canvas principale ──
   let r = max(width, height) * 0.8;
   let angle = time * 0.1;
   let x1 = width / 2 + cos(angle) * r;
@@ -98,10 +91,8 @@ function draw() {
   grad.addColorStop(1, "white");
   drawingContext.fillStyle = grad;
   drawingContext.fillRect(0, 0, width, height);
-  pop();
 
-  // SERPENTONE: aggiorna circleLayer solo con i cerchi nuovi/rimossi
-  // Non ridisegna mai tutto — solo le differenze
+  // ── SERPENTONE: aggiorna drawnCircles e disegna sul canvas ──
   if (currentSegment) {
     for (let f = 0; f < CIRCLES_PER_FRAME; f++) {
       if (drawIndex < currentSegment.px.length) {
@@ -109,10 +100,6 @@ function draw() {
         let y = currentSegment.py[drawIndex];
         let radius = 50 + 45 * sin(colorPhase * 6);
         let gray = 127 + 127 * sin(colorPhase * 8);
-
-        // Disegna direttamente sul layer persistente
-        circleLayer.fill(gray);
-        circleLayer.circle(x, y, radius);
 
         if (frameCount % 3 === 0) {
           song.setVolume(map(gray, 0, 255, 0, 0.25), 0.5);
@@ -130,7 +117,6 @@ function draw() {
     }
   }
 
-  // Rimuovi i cerchi vecchi e ridisegna il layer da zero
   if (segmentBoundaries.length > MAX_SEGMENTS) {
     for (let f = 0; f < CIRCLES_PER_FRAME; f++) {
       if (drawnCircles.length > 0) {
@@ -140,19 +126,21 @@ function draw() {
         }
       }
     }
-    // Ridisegna il layer da zero dopo la rimozione
-    circleLayer.clear();
-    circleLayer.noStroke();
-    for (let c of drawnCircles) {
-      circleLayer.fill(c.gray);
-      circleLayer.circle(c.x, c.y, c.radius);
-    }
   }
 
-  // Stampa il layer cerchi sul canvas principale
-  image(circleLayer, 0, 0);
+  // Disegna tutti i cerchi sul canvas principale
+  noStroke();
+  for (let c of drawnCircles) {
+    fill(c.gray);
+    circle(c.x, c.y, c.radius);
+  }
 
-  // GRAIN SHADER: solo desktop
+  // Cerchi di curvatura — sul canvas principale, prima del grain
+  if (showCurvatureCircle && currentSegment) {
+    drawCurvatureCircle(currentSegment);
+  }
+
+  // ── GRAIN SHADER: solo desktop ──
   if (!IS_MOBILE) {
     bgLayer.clear();
     bgLayer.drawingContext.drawImage(
@@ -175,14 +163,9 @@ function draw() {
     image(grainLayer, 0, 0);
   }
 
-  // Cerchi di curvatura — nitidi sopra il grain
-  if (showCurvatureCircle && currentSegment) {
-    drawCurvatureCircle(currentSegment);
-  }
-
   justAte = false;
 
-  // Bordo gioco
+  // Bordo gioco — nitido sopra il grain
   drawingContext.strokeStyle = "rgba(255,255,255,0.4)";
   drawingContext.lineWidth = 1;
   drawingContext.strokeRect(gameX, gameY, gameSize, gameSize);
@@ -200,15 +183,13 @@ function draw() {
       hiss.play();
     }
     s.update();
-    snakeDirty = true; // il serpente si è mosso, ridisegna
+    snakeDirty = true;
   }
 
-  // Snake layer: ridisegna solo se il serpente si è mosso
   if (snakeDirty) {
     s.show();
     snakeDirty = false;
   } else {
-    // Altrimenti stampa semplicemente il layer già pronto
     blendMode(DIFFERENCE);
     fill(255);
     noStroke();
@@ -233,12 +214,11 @@ function draw() {
   if (millis() - ateTime < 1000) {
     let elapsed = millis() - ateTime;
     let alpha = map(elapsed, 0, 400, 255, 0);
+    blendMode(BLEND);
     fill(255, alpha);
     rect(0, 0, width, height);
     hiss.setVolume(map(elapsed, 0, 1000, 1, 0));
   }
-
-  drawTouchHints();
 }
 
 // ─── CERCHIO DI CURVATURA CON FADE ───────────────────────────
@@ -307,67 +287,35 @@ function drawCurvatureCircle(seg) {
   }
 }
 
-function drawTouchHints() {
+function createTouchButtons() {
   if (!IS_MOBILE) return;
 
-  let margin = scl * 1.2;
-  let r = scl * 0.35;
-  let pulse = 0.15 + 0.1 * sin(frameCount * 0.05); // pulsazione lenta
+  const bar = document.createElement("div");
+  bar.id = "bar";
 
-  blendMode(BLEND);
-  noFill();
-  stroke(255, 60);
-  strokeWeight(1);
+  const dirs = [
+    { label: "&#8592;", dir: [-1, 0] },
+    { label: "&#8595;", dir: [0, 1] },
+    { label: "&#8593;", dir: [0, -1] },
+    { label: "&#8594;", dir: [1, 0] },
+  ];
 
-  // Su
-  circle(width / 2, margin, r * 2);
-  // Giù
-  circle(width / 2, height - margin, r * 2);
-  // Sinistra
-  circle(margin, height / 2, r * 2);
-  // Destra
-  circle(width - margin, height / 2, r * 2);
+  for (let d of dirs) {
+    const btn = document.createElement("div");
+    btn.classList.add("btn");
+    btn.innerHTML = d.label;
+    btn.addEventListener(
+      "touchstart",
+      (e) => {
+        e.preventDefault();
+        s.dir(d.dir[0], d.dir[1]);
+        autoMode = false;
+        lastKeyFrame = frameCount;
+      },
+      { passive: false },
+    );
+    bar.appendChild(btn);
+  }
 
-  // Freccia interna — piccolo triangolino
-  fill(255, pulse * 255);
-  noStroke();
-  // Su
-  triangle(
-    width / 2,
-    margin - r * 0.6,
-    width / 2 - r * 0.4,
-    margin + r * 0.3,
-    width / 2 + r * 0.4,
-    margin + r * 0.3,
-  );
-  // Giù
-  triangle(
-    width / 2,
-    height - margin + r * 0.6,
-    width / 2 - r * 0.4,
-    height - margin - r * 0.3,
-    width / 2 + r * 0.4,
-    height - margin - r * 0.3,
-  );
-  // Sinistra
-  triangle(
-    margin - r * 0.6,
-    height / 2,
-    margin + r * 0.3,
-    height / 2 - r * 0.4,
-    margin + r * 0.3,
-    height / 2 + r * 0.4,
-  );
-  // Destra
-  triangle(
-    width - margin + r * 0.6,
-    height / 2,
-    width - margin - r * 0.3,
-    height / 2 - r * 0.4,
-    width - margin - r * 0.3,
-    height / 2 + r * 0.4,
-  );
-
-  noStroke();
-  strokeWeight(1);
+  document.body.appendChild(bar);
 }

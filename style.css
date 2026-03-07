@@ -1,8 +1,39 @@
-html, body {
+html,
+body {
   margin: 0;
   padding: 0;
 }
 
 canvas {
   display: block;
+}
+
+#bar {
+  position: fixed;
+  display: flex;
+  flex-direction: row;
+
+  align-items: center;
+  justify-content: space-evenly;
+  bottom: 0;
+  left: 0;
+  width: 100%;
+  height: 12vh;
+  z-index: 10;
+  pointer-events: auto;
+}
+
+.btn {
+  font-weight: 100;
+  font-family: cursive;
+  width: 100%;
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 3vh;
+  color: white;
+  height: 100%;
+  user-select: none;
+  -webkit-user-select: none;
 }
