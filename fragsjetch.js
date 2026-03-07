@@ -1,4 +1,4 @@
-///SERPENTONE
+//SERPENTONE
 let time = 0;
 let curvature;
 let currentPoint;
@@ -21,7 +21,6 @@ let grainLayer;
 let bgLayer;
 let snakeLayer;
 let snakeDirty = true;
-let snakeReady = false;
 
 function preload() {
   song = loadSound("sound.mp3");
@@ -44,9 +43,9 @@ function setup() {
   snakeLayer = createGraphics(windowWidth, windowHeight);
 
   if (!IS_MOBILE) {
-    grainLayer = createGraphics(windowWidth, windowHeight, WEBGL);
+    grainLayer = createGraphics(width, height, WEBGL);
     grainLayer.noStroke();
-    bgLayer = createGraphics(windowWidth, windowHeight);
+    bgLayer = createGraphics(width, height);
     bgLayer.noStroke();
   }
 
@@ -188,20 +187,13 @@ function draw() {
     snakeDirty = true;
   }
 
+  // Snake: ridisegna solo quando si muove (snakeDirty)
   if (snakeDirty) {
     s.show();
     snakeDirty = false;
-  } else {
-    blendMode(DIFFERENCE);
-    fill(255);
-    noStroke();
-    for (var i = 0; i < s.tail.length; i++) {
-      rect(gameX + s.tail[i].x, gameY + s.tail[i].y, scl, scl);
-    }
-    rect(gameX + s.x, gameY + s.y, scl, scl);
-    blendMode(BLEND);
-    image(snakeLayer, 0, 0);
   }
+  blendMode(BLEND);
+  image(snakeLayer, 0, 0);
 
   // Cibo
   blendMode(BLEND);
