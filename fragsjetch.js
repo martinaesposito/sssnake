@@ -1,3 +1,5 @@
+/////
+////SERPENTONE
 //SERPENTONE
 let time = 0;
 let curvature;
@@ -10,7 +12,7 @@ let segmentCount = 0;
 let colorPhase = 0;
 
 const IS_MOBILE = /Mobi|Android|iPhone|iPad/i.test(navigator.userAgent);
-const CIRCLES_PER_FRAME = IS_MOBILE ? 1 : 6;
+const CIRCLES_PER_FRAME = IS_MOBILE ? 2 : 6;
 const MAX_SEGMENTS = IS_MOBILE ? 2 : 3;
 let segmentBoundaries = [0];
 
@@ -22,7 +24,6 @@ let bgLayer;
 let snakeLayer;
 let snakeDirty = true;
 let circleLayer;
-let circleLayerDirty = false;
 
 function preload() {
   song = loadSound("sound.mp3");
@@ -73,7 +74,6 @@ function setup() {
 
   song.loop();
   song.setVolume(0);
-
   createTouchButtons();
 }
 
@@ -97,7 +97,7 @@ function draw() {
   drawingContext.fillStyle = grad;
   drawingContext.fillRect(0, 0, width, height);
 
-  // ── SERPENTONE: nuovi cerchi → circleLayer incrementale ──
+  // ── SERPENTONE: aggiorna drawnCircles e disegna sul canvas ──
   if (currentSegment) {
     for (let f = 0; f < CIRCLES_PER_FRAME; f++) {
       if (drawIndex < currentSegment.px.length) {
@@ -126,7 +126,7 @@ function draw() {
     }
   }
 
-  // Rimozione graduale — ridisegna circleLayer solo quando finisce la fase
+  // Rimozione graduale + ridisegna il layer ogni frame (scomparsa progressiva)
   if (segmentBoundaries.length > MAX_SEGMENTS) {
     for (let f = 0; f < CIRCLES_PER_FRAME; f++) {
       if (drawnCircles.length > 0) {
@@ -137,15 +137,12 @@ function draw() {
         if (segmentBoundaries[0] === 0) segmentBoundaries.shift();
       }
     }
-    circleLayerDirty = true;
-  } else if (circleLayerDirty) {
     circleLayer.clear();
     circleLayer.noStroke();
     for (let ci of drawnCircles) {
       circleLayer.fill(ci.gray);
       circleLayer.circle(ci.x, ci.y, ci.radius);
     }
-    circleLayerDirty = false;
   }
 
   image(circleLayer, 0, 0);
