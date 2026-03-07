@@ -12,28 +12,33 @@ canvas {
   position: fixed;
   display: flex;
   flex-direction: row;
-
+  box-sizing: border-box;
   align-items: center;
   justify-content: space-evenly;
   bottom: 0;
   left: 0;
   width: 100%;
-  height: 12vh;
+  height: 14vh;
   z-index: 10;
+  gap: 4vh;
   pointer-events: auto;
+  padding: 2vh;
+  margin: auto;
 }
 
 .btn {
   font-weight: 100;
   font-family: cursive;
-  width: 100%;
+  border: solid 1px rgba(255, 255, 255, 0.25);
+  border-radius: 100%;
   flex: 1;
   display: flex;
+  width: auto;
   align-items: center;
   justify-content: center;
   font-size: 3vh;
   color: white;
-  height: 100%;
+  height: 9vh;
   user-select: none;
   -webkit-user-select: none;
 }
