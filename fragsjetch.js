@@ -21,6 +21,7 @@ let grainLayer;
 let bgLayer;
 let snakeLayer;
 let snakeDirty = true;
+let circleLayer;
 
 function preload() {
   song = loadSound("sound.mp3");
@@ -41,6 +42,8 @@ function setup() {
   noStroke();
 
   snakeLayer = createGraphics(windowWidth, windowHeight);
+  circleLayer = createGraphics(windowWidth, windowHeight);
+  circleLayer.noStroke();
 
   if (!IS_MOBILE) {
     grainLayer = createGraphics(windowWidth, windowHeight, WEBGL);
@@ -92,7 +95,7 @@ function draw() {
   drawingContext.fillStyle = grad;
   drawingContext.fillRect(0, 0, width, height);
 
-  // ── SERPENTONE: aggiorna drawnCircles e disegna sul canvas ──
+  // ── SERPENTONE: accumula cerchi su circleLayer (persistente) ──
   if (currentSegment) {
     for (let f = 0; f < CIRCLES_PER_FRAME; f++) {
       if (drawIndex < currentSegment.px.length) {
@@ -104,6 +107,11 @@ function draw() {
         if (frameCount % 3 === 0) {
           song.setVolume(map(gray, 0, 255, 0, 0.25), 0.5);
         }
+
+        // Disegna direttamente sul layer persistente — non ridisegna tutto
+        circleLayer.fill(gray);
+        circleLayer.noStroke();
+        circleLayer.circle(x, y, radius);
 
         drawnCircles.push({ x, y, radius, gray });
         colorPhase += 0.002;
@@ -117,23 +125,31 @@ function draw() {
     }
   }
 
+  // Rimuovi i cerchi vecchi: full redraw del layer (raro — solo al cambio segmento)
   if (segmentBoundaries.length > MAX_SEGMENTS) {
+    let removed = false;
     for (let f = 0; f < CIRCLES_PER_FRAME; f++) {
       if (drawnCircles.length > 0) {
         drawnCircles.shift();
         for (let i = 0; i < segmentBoundaries.length; i++) {
           segmentBoundaries[i] = max(0, segmentBoundaries[i] - 1);
         }
+        removed = true;
+      }
+    }
+    if (removed) {
+      // Ridisegna il layer da zero solo quando si rimuovono cerchi vecchi
+      circleLayer.clear();
+      circleLayer.noStroke();
+      for (let c of drawnCircles) {
+        circleLayer.fill(c.gray);
+        circleLayer.circle(c.x, c.y, c.radius);
       }
     }
   }
 
-  // Disegna tutti i cerchi sul canvas principale
-  noStroke();
-  for (let c of drawnCircles) {
-    fill(c.gray);
-    circle(c.x, c.y, c.radius);
-  }
+  // Stampa il layer sul canvas — una sola operazione
+  image(circleLayer, 0, 0);
 
   // Cerchi di curvatura — sul canvas principale, prima del grain
   if (showCurvatureCircle && currentSegment) {
