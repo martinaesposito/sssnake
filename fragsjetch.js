@@ -21,6 +21,8 @@ let grainLayer;
 let bgLayer;
 let snakeLayer;
 let snakeDirty = true;
+let circleLayer;
+let circleLayerDirty = false;
 
 function preload() {
   song = loadSound("sound.mp3");
@@ -41,11 +43,13 @@ function setup() {
   noStroke();
 
   snakeLayer = createGraphics(windowWidth, windowHeight);
+  circleLayer = createGraphics(windowWidth, windowHeight);
+  circleLayer.noStroke();
 
   if (!IS_MOBILE) {
-    grainLayer = createGraphics(width, height, WEBGL);
+    grainLayer = createGraphics(windowWidth, windowHeight, WEBGL);
     grainLayer.noStroke();
-    bgLayer = createGraphics(width, height);
+    bgLayer = createGraphics(windowWidth, windowHeight);
     bgLayer.noStroke();
   }
 
@@ -73,7 +77,7 @@ function setup() {
   createTouchButtons();
 }
 
-//
+/////////
 function draw() {
   blendMode(BLEND);
   background(0);
@@ -93,7 +97,8 @@ function draw() {
   drawingContext.fillStyle = grad;
   drawingContext.fillRect(0, 0, width, height);
 
-  // ── SERPENTONE: aggiorna drawnCircles e disegna sul canvas ──
+  // ── SERPENTONE ──
+  // Aggiungi nuovi cerchi direttamente su circleLayer (incrementale)
   if (currentSegment) {
     for (let f = 0; f < CIRCLES_PER_FRAME; f++) {
       if (drawIndex < currentSegment.px.length) {
@@ -105,6 +110,10 @@ function draw() {
         if (frameCount % 3 === 0) {
           song.setVolume(map(gray, 0, 255, 0, 0.25), 0.5);
         }
+
+        circleLayer.fill(gray);
+        circleLayer.noStroke();
+        circleLayer.circle(x, y, radius);
 
         drawnCircles.push({ x, y, radius, gray });
         colorPhase += 0.002;
@@ -118,23 +127,30 @@ function draw() {
     }
   }
 
-  if (segmentBoundaries.length > MAX_SEGMENTS) {
+  // Rimuovi cerchi vecchi gradualmente — segna layer come dirty UNA volta
+  if (segmentBoundaries.length > MAX_SEGMENTS && !circleLayerDirty) {
     for (let f = 0; f < CIRCLES_PER_FRAME; f++) {
       if (drawnCircles.length > 0) {
         drawnCircles.shift();
         for (let i = 0; i < segmentBoundaries.length; i++) {
           segmentBoundaries[i] = max(0, segmentBoundaries[i] - 1);
         }
+        if (segmentBoundaries[0] === 0) segmentBoundaries.shift();
       }
     }
+    circleLayerDirty = true;
+  } else if (segmentBoundaries.length <= MAX_SEGMENTS && circleLayerDirty) {
+    // Ridisegna il layer UNA volta sola quando finisce la rimozione
+    circleLayer.clear();
+    circleLayer.noStroke();
+    for (let ci of drawnCircles) {
+      circleLayer.fill(ci.gray);
+      circleLayer.circle(ci.x, ci.y, ci.radius);
+    }
+    circleLayerDirty = false;
   }
 
-  // Disegna tutti i cerchi sul canvas principale
-  noStroke();
-  for (let c of drawnCircles) {
-    fill(c.gray);
-    circle(c.x, c.y, c.radius);
-  }
+  image(circleLayer, 0, 0);
 
   // Cerchi di curvatura — sul canvas principale, prima del grain
   if (showCurvatureCircle && currentSegment) {
@@ -187,13 +203,20 @@ function draw() {
     snakeDirty = true;
   }
 
-  // Snake: ridisegna solo quando si muove (snakeDirty)
   if (snakeDirty) {
     s.show();
     snakeDirty = false;
+  } else {
+    blendMode(DIFFERENCE);
+    fill(255);
+    noStroke();
+    for (var i = 0; i < s.tail.length; i++) {
+      rect(gameX + s.tail[i].x, gameY + s.tail[i].y, scl, scl);
+    }
+    rect(gameX + s.x, gameY + s.y, scl, scl);
+    blendMode(BLEND);
+    image(snakeLayer, 0, 0);
   }
-  blendMode(BLEND);
-  image(snakeLayer, 0, 0);
 
   // Cibo
   blendMode(BLEND);
